@@ -1,9 +1,12 @@
 """
     Main program for getting an ip by anydesk.
-    Run this script just someone try to connect to your PC.
 """
+import os
+import sys
 import wmi
 import psutil
+
+from requests import get
 
 def get_ips() -> list:
     """ Getting the list of ips of anydesk """
@@ -15,42 +18,86 @@ def get_ips() -> list:
     # Iterating through all the running processes
     for process in wmi_obj.Win32_Process():
 
-        # Getting anydesk
-        if 'anydesk' in process.Name.lower():
+        try:
+            # Getting anydesk
+            if 'anydesk' in process.Name.lower():
 
-            # Iterating process connections
-            for conn in psutil.Process(process.ProcessId).connections():
+                # Iterating process connections
+                for conn in psutil.Process(process.ProcessId).connections():
 
-                # Getting only SYN SENT connections
-                if conn.status in ('SYN_SENT', 'ESTABLISHED'):
+                    # Getting only SYN SENT connections
+                    if conn.status in ('SYN_SENT', 'ESTABLISHED'):
 
-                    # Getting remote address ip and port
-                    conn_ip = conn.raddr.ip
+                        # Getting remote address ip and port
+                        conn_ip = conn.raddr.ip
 
-                    # Port 80 is anydesk server
-                    if conn.raddr.port != 80:
+                        # Port 80 is anydesk server
+                        if conn.raddr.port != 80:
 
-                        # Check if is the local ip LOL
-                        if not conn_ip.startswith('192.168.'):
+                            # Check if is the local ip LOL
+                            if not conn_ip.startswith('192.168.'):
 
-                            # Checking if the ip is duplicated
-                            if not conn_ip in ips:
+                                # Checking if the ip is duplicated
+                                if not conn_ip in ips:
 
-                                # Adding ip to the ips list
-                                ips.append(f"{conn_ip}")
+                                    # Adding ip to the ips list
+                                    ips.append(f"{conn_ip}")
+        except psutil.NoSuchProcess:
+            pass
 
     return ips
 
+def get_ip_info(conn_ip: str) -> dict:
+    """ Get information about an IP """
+
+    info_obj = get(f'http://ip-api.com/json/{conn_ip}').json()
+
+    country = info_obj.get('country', 'Unknown')
+    region = info_obj.get('regionName', 'Unknown')
+    city = info_obj.get('city', 'Unknown')
+    isp = info_obj.get('isp', 'Unknown')
+
+    return dict(
+            IP=conn_ip,
+            Country=country,
+            Region=region,
+            City=city,
+            ISP=isp
+        )
+
+
+def try_exit() -> None:
+    """ Exit from the program """
+    try:
+        sys.exit(0)
+    except SystemExit:
+        os._exit(0) # pylint: disable=protected-access
+
+
 def main() -> None:
     """ Main program """
-    ips = get_ips()
+    msg = 'Anydesk is turned off or noone is trying to connect to your monitor, retry... [CTRL+C to exit]'
+    while True:
+        try:
+            ips = get_ips()
+            print(' ' * len(msg), flush=False, end='\r')
 
-    # printing ips
-    if len(ips) > 0:
-        for conn_ip in ips:
-            print(f"Connection Found, IP: {conn_ip}")
-    else:
-        print('Anydesk is turned off or nobody is trying to connecting to your monitor...')
+            # printing ips
+            if len(ips) > 0:
+                for conn_ip in ips:
+                    print("Connection Found, infos:")
+                    infos = get_ip_info(conn_ip)
+                    for key, value in infos.items():
+                        print(f'{key}: {value}')
+
+            else:
+                print(msg, flush=True, end='\r')
+        except KeyboardInterrupt:
+            print('\nProgram finished, exit...')
+            try_exit()
+
+        if len(ips) > 0:
+            break
 
 
 if __name__ == '__main__':
