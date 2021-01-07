@@ -4,9 +4,10 @@
 
 ## Download Tutorial [git needed]
 1. `git clone https://github.com/Pari030/GetIpByAnydesk`
-1. `cd GetIpByAnydesk`
-1. `py -m pip install -r requirements.txt`
-1. `py main.py`
+0. `cd GetIpByAnydesk`
+0. `py -m pip install -r requirements.txt`
+0. `cd src`
+0. `py main.py`
 
 ## Features
 - [x] **Automatic waiting and retry until anyone connect to your minitor.**
